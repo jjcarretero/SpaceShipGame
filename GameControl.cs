@@ -109,6 +109,12 @@ public class GameControl : MonoBehaviour
 		}
 	}
 
+	//UI upload for slider
+	public void ProgressionBar()
+	{
+		ProgressSlider.value = ProgressSlider.value + (0.0165f * Time.deltaTime);
+	}
+
 #region Score
 	//Initial Score (int = 0) and each time Player kill an Enemy
 	public void GetScore(int EnemyScore)
@@ -127,7 +133,228 @@ public class GameControl : MonoBehaviour
 	}
 #endregion
 
-	//When Player is Hit, UI Upload
+#region Player Control
+
+	//To Move Player, only Up and down
+	private void Movement()
+	{
+		Rigid.velocity = new Vector2(0, Speed * Input.GetAxis("Vertical"));
+		if (transform.position.y >= 2.5f)
+			transform.position = new Vector3(transform.position.x, 2.5f, 0);
+		if (transform.position.y <= -4f)
+			transform.position = new Vector3(transform.position.x, -4f, 0);
+		if (b_FinalBoss == false)
+			transform.Translate(Vector2.right * 0.5f * Speed * Time.deltaTime);
+	}
+
+	//To enable the right sprite when moving up, down and still
+	private void DirDetect()
+	{
+		if (Speed != 0)
+		{
+			if (Input.GetAxis("Vertical") > 0)
+			{
+				transform.GetChild(0).gameObject.SetActive(false);
+				transform.GetChild(2).gameObject.SetActive(false);
+				transform.GetChild(1).gameObject.SetActive(true);
+			}
+
+			if (Input.GetAxis("Vertical") < 0)
+			{
+				transform.GetChild(0).gameObject.SetActive(false);
+				transform.GetChild(2).gameObject.SetActive(true);
+				transform.GetChild(1).gameObject.SetActive(false);
+			}
+
+			if (Input.GetAxis("Vertical") == 0)
+			{
+				transform.GetChild(0).gameObject.SetActive(true);
+				transform.GetChild(2).gameObject.SetActive(false);
+				transform.GetChild(1).gameObject.SetActive(false);
+			}
+		}
+	}
+
+	//Player Attack when Space Key is pressed and Player is not attacking
+	private void Attack()
+	{
+		if (Input.GetKey(KeyCode.Space) && b_GunReady == true && b_PowerUpTriple == true)
+		{
+			GameObject tmp01 = (GameObject)Instantiate(Bullet, BulletPos01.position, Quaternion.Euler(0, 0, 0));
+			GameObject tmp02 = (GameObject)Instantiate(Bullet, BulletPos02.position, Quaternion.Euler(0, 0, 0));
+			GameObject tmp03 = (GameObject)Instantiate(Bullet, BulletPos01.position, Quaternion.Euler(0, 0, 30));
+			GameObject tmp04 = (GameObject)Instantiate(Bullet, BulletPos02.position, Quaternion.Euler(0, 0, -30));
+			b_GunReady = false;
+		}
+		else if (Input.GetKey(KeyCode.Space) && b_GunReady == true && b_PowerUpTriple == false)
+		{
+			GameObject tmp01 = (GameObject)Instantiate(Bullet, BulletPos01.position, Quaternion.Euler(0, 0, 0));
+			GameObject tmp02 = (GameObject)Instantiate(Bullet, BulletPos02.position, Quaternion.Euler(0, 0, 0));
+			b_GunReady = false;
+		}
+	}
+
+	//Player Fire Rating are introduced manually with floats, we could do global variables to avoid numbers
+	public void FireRating()
+	{
+		FireRate = FireRate + Time.deltaTime;
+		if (b_PowerUpSpeed == true)
+		{
+			if (FireRate > 0.2f)
+			{
+				b_GunReady = true;
+				FireRate = 0;
+			}
+		}
+		else
+		{
+			if (FireRate > 0.8f)
+			{
+				b_GunReady = true;
+				FireRate = 0;
+			}
+		}
+	}
+
+#endregion
+
+#region Enemy and PowerUp Spawns
+
+	public void CreateEnemy01()
+	{
+		GameObject NewEnemy = (GameObject)Instantiate(Enemies[0], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
+		NewEnemy.GetComponent<EnemyControl>().Manager = transform.GetComponent<GameControl>();
+		NewEnemy.GetComponent<EnemyControl>().Player = transform.gameObject;
+		SavedEnemies.Add(NewEnemy);
+	}
+
+	public void CreateEnemy02()
+	{
+		GameObject NewEnemy = (GameObject)Instantiate(Enemies[1], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) + 0.5f, 0), Quaternion.Euler(0, 0, 0));
+		NewEnemy.GetComponent<EnemyControl>().Manager = transform.GetComponent<GameControl>();
+		NewEnemy.GetComponent<EnemyControl>().Player = transform.gameObject;
+		SavedEnemies.Add(NewEnemy);
+	}
+
+	public void CreateBoss()
+	{
+		GameObject NewEnemy = (GameObject)Instantiate(Enemies[2], new Vector3(transform.position.x + 16f, 0, 0), Quaternion.Euler(0, 0, 0));
+		NewEnemy.GetComponent<EnemyControl>().Manager = transform.GetComponent<GameControl>();
+		NewEnemy.GetComponent<EnemyControl>().Player = transform.gameObject;
+		NewEnemy.GetComponent<EnemyControl>().BossBool = true;
+		NewEnemy.GetComponent<EnemyControl>().Health = 100;
+		NewEnemy.GetComponent<EnemyControl>().MaxHealth = 100;
+		SavedEnemies.Add(NewEnemy);
+	}
+
+	private void RespawnEnemy01()
+	{
+		RateEnemy01 += Time.deltaTime;
+		if (RateEnemy01 > Random.Range(2, 6))
+		{
+			CreateEnemy01();
+			RateEnemy01 = 0;
+		}
+	}
+
+	private void RespawnEnemy02()
+	{
+		RateEnemy02 += Time.deltaTime;
+		if (RateEnemy02 > Random.Range(3, 4.5f))
+		{
+			CreateEnemy02();
+			RateEnemy02 = 0;
+		}
+	}
+
+	public void RespawnPowerUp()
+	{
+		PowerUpRespawn += Time.deltaTime;
+		if (PowerUpRespawn > Random.Range(4, 10))
+		{
+			CreatePowerUp();
+			PowerUpRespawn = 0;
+		}
+	}
+
+	//Spawn Power Up
+	public void CreatePowerUp()
+	{
+		RandomPowerUp = Random.Range(1, 4);
+		if (RandomPowerUp == 1)
+			GameObject NewPowerUp = (GameObject)Instantiate(PowerUps[0], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
+		else if (RandomPowerUp == 2)
+			GameObject NewPowerUp = (GameObject)Instantiate(PowerUps[1], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
+		else if (RandomPowerUp == 3)
+			GameObject NewPowerUp = (GameObject)Instantiate(PowerUps[2], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
+	}
+
+	//Change UI Image for Power Ups
+	public void PowerImage()
+	{
+		if (b_PowerUpSpeed == true)
+		{
+			PowerUpImg.transform.GetChild(0).gameObject.SetActive(false);
+			PowerUpImg.transform.GetChild(1).gameObject.SetActive(true);
+			PowerUpImg.transform.GetChild(2).gameObject.SetActive(false);
+		}
+		else if (b_PowerUpTriple == true)
+		{
+			PowerUpImg.transform.GetChild(0).gameObject.SetActive(false);
+			PowerUpImg.transform.GetChild(1).gameObject.SetActive(false);
+			PowerUpImg.transform.GetChild(2).gameObject.SetActive(true);
+		}
+		else
+		{
+			PowerUpImg.transform.GetChild(0).gameObject.SetActive(true);
+			PowerUpImg.transform.GetChild(1).gameObject.SetActive(false);
+			PowerUpImg.transform.GetChild(2).gameObject.SetActive(false);
+		}
+	}
+
+#endregion
+
+#region PlayerTrigger
+
+	private void OnTriggerEnter2D(Collider2D Col)
+	{
+		if (Col.tag == "Enemy" || Col.tag == "Enemy02" || Col.tag == "BossBullet")
+			GetDamage();
+
+		else if (Col.tag == "Armor")
+		{
+			Armor = Armor + 10;
+			ArmorBar.fillAmount = (float)Armor / 100;
+			Destroy(Col.gameObject);
+		}
+
+		if (Col.tag == "PowerUpSpeed")
+		{
+			b_PowerUpSpeed = true;
+			Destroy(Col.gameObject);
+		}
+
+		if (Col.tag == "PowerUpTriple")
+		{
+			b_PowerUpTriple = true;
+			Destroy(Col.gameObject);
+		}
+	}
+
+	//When player recieves Damage. Life remove only if armor == 0
+	public void GetDamage()
+	{
+		if (b_DeadPlayer == false && Armor == 0)
+			RemoveLife();
+
+		else if (b_DeadPlayer == false && Armor != 0)
+		{
+			Armor = Armor - 10;
+			ArmorBar.fillAmount = (float)Armor / 100;
+		}
+	}
+
+	//When Player has Life removed, UI Upload
 	public void RemoveLife()
 	{
 		Lifes -= 1;
@@ -145,284 +372,22 @@ public class GameControl : MonoBehaviour
 		}
 	}
 
-    private void DirDetect()
-    {
+#endregion
 
-        if (Speed != 0)
-        {
-            if (Input.GetAxis("Vertical") > 0)
-            {
-                transform.GetChild(0).gameObject.SetActive(false);
-                transform.GetChild(2).gameObject.SetActive(false);
-                transform.GetChild(1).gameObject.SetActive(true);
-            }
+	//When the game is finished and Player didnt die
+	public void WinGame()
+	{
+		if (Score > MaxScore)
+			PlayerPrefs.SetInt("SpaceShipGame_MaxScore", Score);
+		FinalText.enabled = true;
+		Invoke("ToMainMenu", 4);
+		Camera.GetComponent<CameraControl>().Speed = 0;
+		transform.Translate(transform.position.x + 13, transform.position.y, transform.position.z);
+	}
 
-            if (Input.GetAxis("Vertical") < 0)
-            {
-                transform.GetChild(0).gameObject.SetActive(false);
-                transform.GetChild(2).gameObject.SetActive(true);
-                transform.GetChild(1).gameObject.SetActive(false);
-            }
-
-            if (Input.GetAxis("Vertical") == 0)
-            {
-                transform.GetChild(0).gameObject.SetActive(true);
-                transform.GetChild(2).gameObject.SetActive(false);
-                transform.GetChild(1).gameObject.SetActive(false);
-            }
-        }
-
-
-    }
-
-    private void Movement()
-    {
-        Rigid.velocity = new Vector2(0, Speed * Input.GetAxis("Vertical"));
-
-        if (transform.position.y >= 2.5f)
-        {
-            transform.position = new Vector3(transform.position.x, 2.5f, 0);
-        }
-        if (transform.position.y <= -4f)
-        {
-            transform.position = new Vector3(transform.position.x, -4f, 0);
-        }
-
-        if (b_FinalBoss == false)
-        {
-            transform.Translate(Vector2.right * 0.5f * Speed * Time.deltaTime);
-        }
-
-    }
-
-    private void Attack()
-    {
-
-        if (Input.GetKey(KeyCode.Space) && b_GunReady == true && b_PowerUpTriple == true)
-        {
-            GameObject tmp01 = (GameObject)Instantiate(Bullet, BulletPos01.position, Quaternion.Euler(0, 0, 0));
-
-            GameObject tmp02 = (GameObject)Instantiate(Bullet, BulletPos02.position, Quaternion.Euler(0, 0, 0));
-            GameObject tmp03 = (GameObject)Instantiate(Bullet, BulletPos01.position, Quaternion.Euler(0, 0, 30));
-            GameObject tmp04 = (GameObject)Instantiate(Bullet, BulletPos02.position, Quaternion.Euler(0, 0, -30));
-
-            b_GunReady = false;
-        }
-        else if (Input.GetKey(KeyCode.Space) && b_GunReady == true && b_PowerUpTriple == false)
-        {
-            GameObject tmp01 = (GameObject)Instantiate(Bullet, BulletPos01.position, Quaternion.Euler(0, 0, 0));
-
-            GameObject tmp02 = (GameObject)Instantiate(Bullet, BulletPos02.position, Quaternion.Euler(0, 0, 0));
-
-            b_GunReady = false;
-        }
-    }
-
-    public void CreateEnemy01()
-    {
-        GameObject NewEnemy = (GameObject)Instantiate(Enemies[0], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
-        NewEnemy.GetComponent<EnemyControl>().Manager = transform.GetComponent<GameControl>();
-        NewEnemy.GetComponent<EnemyControl>().Player = transform.gameObject;
-        SavedEnemies.Add(NewEnemy);
-
-    }
-
-    public void CreateEnemy02()
-    {
-        GameObject NewEnemy = (GameObject)Instantiate(Enemies[1], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) + 0.5f, 0), Quaternion.Euler(0, 0, 0));
-        NewEnemy.GetComponent<EnemyControl>().Manager = transform.GetComponent<GameControl>();
-        NewEnemy.GetComponent<EnemyControl>().Player = transform.gameObject;
-        SavedEnemies.Add(NewEnemy);
-    }
-
-    public void CreateBoss()
-    {
-        GameObject NewEnemy = (GameObject)Instantiate(Enemies[2], new Vector3(transform.position.x + 16f, 0, 0), Quaternion.Euler(0, 0, 0));
-        NewEnemy.GetComponent<EnemyControl>().Manager = transform.GetComponent<GameControl>();
-        NewEnemy.GetComponent<EnemyControl>().Player = transform.gameObject;
-        NewEnemy.GetComponent<EnemyControl>().BossBool = true;
-        NewEnemy.GetComponent<EnemyControl>().Health = 100;
-        NewEnemy.GetComponent<EnemyControl>().MaxHealth = 100;
-        SavedEnemies.Add(NewEnemy);
-    }
-
-    private void RespawnEnemy01()
-    {
-
-        RateEnemy01 += Time.deltaTime;
-        if (RateEnemy01 > Random.Range(2, 6))
-        {
-            CreateEnemy01();
-            RateEnemy01 = 0;
-
-        }
-
-
-    }
-
-    private void RespawnEnemy02()
-    {
-
-        RateEnemy02 += Time.deltaTime;
-        if (RateEnemy02 > Random.Range(3, 4.5f))
-        {
-            CreateEnemy02();
-            RateEnemy02 = 0;
-
-        }
-
-
-    }
-
-    public void FireRating()
-    {
-        FireRate = FireRate + Time.deltaTime;
-        if (b_PowerUpSpeed == true)
-        {
-            if (FireRate > 0.2f)
-            {
-                b_GunReady = true;
-                FireRate = 0;
-            }
-        }
-        else
-        {
-            if (FireRate > 0.8f)
-            {
-                b_GunReady = true;
-                FireRate = 0;
-            }
-        }
-
-
-    }
-
-    private void OnTriggerEnter2D(Collider2D Col)
-    {
-        if (Col.tag == "Enemy")
-        {
-            GetDamage();
-        }
-
-        if (Col.tag == "Enemy02")
-        {
-            GetDamage();
-        }
-
-        if (Col.tag == "BossBullet")
-        {
-            GetDamage();
-        }
-
-        if (Col.tag == "Armor")
-        {
-            Armor = Armor + 10;
-            ArmorBar.fillAmount = (float)Armor / 100;
-            Destroy(Col.gameObject);
-        }
-
-        if (Col.tag == "PowerUpSpeed")
-        {
-            b_PowerUpSpeed = true;
-            Destroy(Col.gameObject);
-        }
-
-        if (Col.tag == "PowerUpTriple")
-        {
-            b_PowerUpTriple = true;
-            Destroy(Col.gameObject);
-        }
-    }
-
-    public void GetDamage()
-    {
-
-
-        if (b_DeadPlayer == false && Armor == 0)
-        {
-            RemoveLife();
-        }
-
-        if (b_DeadPlayer == false && Armor != 0)
-        {
-            Armor = Armor - 10;
-            ArmorBar.fillAmount = (float)Armor / 100;
-        }
-
-
-    }
-
-    public void ProgressionBar()
-    {
-        ProgressSlider.value = ProgressSlider.value + (0.0165f * Time.deltaTime);
-    }
-
-    public void ToMainMenu()
-    {
-        SceneManager.LoadScene(0);
-    }
-
-    public void RespawnPowerUp()
-    {
-        PowerUpRespawn += Time.deltaTime;
-        if (PowerUpRespawn > Random.Range(4, 10))
-        {
-            CreatePowerUp();
-            PowerUpRespawn = 0;
-        }
-    }
-
-    public void CreatePowerUp()
-    {
-        RandomPowerUp = Random.Range(1, 4);
-
-        if (RandomPowerUp == 1)
-        {
-            GameObject NewPowerUp = (GameObject)Instantiate(PowerUps[0], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
-        }
-        if (RandomPowerUp == 2)
-        {
-            GameObject NewPowerUp = (GameObject)Instantiate(PowerUps[1], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
-        }
-        if (RandomPowerUp == 3)
-        {
-            GameObject NewPowerUp = (GameObject)Instantiate(PowerUps[2], new Vector3(transform.position.x + 16f, Random.Range(-3.5f, 3f) - 0.5f, 0), Quaternion.Euler(0, 0, 0));
-
-        }
-    }
-
-    public void PowerImage()
-    {
-        if (b_PowerUpSpeed == true)
-        {
-            PowerUpImg.transform.GetChild(0).gameObject.SetActive(false);
-            PowerUpImg.transform.GetChild(1).gameObject.SetActive(true);
-            PowerUpImg.transform.GetChild(2).gameObject.SetActive(false);
-        }
-        else if (b_PowerUpTriple == true)
-        {
-            PowerUpImg.transform.GetChild(0).gameObject.SetActive(false);
-            PowerUpImg.transform.GetChild(1).gameObject.SetActive(false);
-            PowerUpImg.transform.GetChild(2).gameObject.SetActive(true);
-        }
-        else
-        {
-            PowerUpImg.transform.GetChild(0).gameObject.SetActive(true);
-            PowerUpImg.transform.GetChild(1).gameObject.SetActive(false);
-            PowerUpImg.transform.GetChild(2).gameObject.SetActive(false);
-        }
-
-    }
-
-    public void WinGame()
-    {
-        if (Score > MaxScore)
-        {
-            PlayerPrefs.SetInt("SpaceShipGame_MaxScore", Score);
-        }
-        FinalText.enabled = true;
-        Invoke("ToMainMenu", 4);
-        Camera.GetComponent<CameraControl>().Speed = 0;
-        transform.Translate(transform.position.x + 13, transform.position.y, transform.position.z);
-    }
+	//Return to main menu
+	public void ToMainMenu()
+	{
+		SceneManager.LoadScene(0);
+	}
 }
